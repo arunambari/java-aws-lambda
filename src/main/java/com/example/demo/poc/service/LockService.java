@@ -13,6 +13,8 @@ import com.example.demo.poc.model.LockItem;
 //LockItem{key='sit-lock', leaseDuration=120000, startTime=12345669, active=true}
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -53,6 +55,11 @@ public class LockService {
         this.startTime = System.currentTimeMillis();
         this.ownerName = generateOwnerNameFromLocalhost();
     }
+
+    public String getOwnerName() {
+        return ownerName;
+    }
+
     AmazonDynamoDB client = AmazonDynamoDBClientBuilder.standard().withRegion(regionString).build();
 //    public LockItem  addItem(String key,long leaseDuration, Long startTime, boolean active) {
 //
@@ -65,6 +72,18 @@ public class LockService {
 //        return lockItem;
 //    }
 
+    public LockItem setStatus(boolean status) {
+        LockItem lockItem = getItem(key);
+        if(lockItem == null) {
+            lockItem = new LockItem(key,leaseDuration,startTime,true,ownerName,System.currentTimeMillis());
+        }
+        lockItem.setActive(status);
+        DynamoDBMapper mapper = new DynamoDBMapper(client);
+        log("updating LockItem in setStatus method"+lockItem);
+        mapper.save(lockItem);
+        return lockItem;
+
+    }
 
     public LockItem putItem() {
         LockItem lockItem = getItem(key);
@@ -77,13 +96,16 @@ public class LockService {
 
                 lockItem.setLeaseRenewalTimeInMilliSeconds(System.currentTimeMillis());
                 lockItem.setOwnerName(ownerName);
-                lockItem.setActive(false);
+                lockItem.setActive(true);
         }  else {
             lockItem.setLeaseRenewalTimeInMilliSeconds(System.currentTimeMillis());
+            lockItem.setActive(true);
         }
 
 
         DynamoDBMapper mapper = new DynamoDBMapper(client);
+        log("updating LockItem in putItem method"+lockItem);
+
         mapper.save(lockItem);
 
         return lockItem;
@@ -115,7 +137,7 @@ public class LockService {
     }
     public void scheduleLockUpdate() {
         long delayInSeconds = leaseDuration/4;
-        context.getLogger().log("Scheduling release lock after "+delayInSeconds);
+        log("Scheduling release lock after "+delayInSeconds);
         ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
         executorService.schedule(()->putItem(),  delayInSeconds, TimeUnit.MILLISECONDS);
     }
@@ -125,5 +147,10 @@ public class LockService {
        //  lockService.deleteItem("sit-lock");
         lockService.putItem();
         System.out.println(lockService.getItem("sit-lock"));
+    }
+    private void log(String message) {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+        LocalDateTime now = LocalDateTime.now();
+        context.getLogger().log(dtf.format(now) +"---"+message);
     }
 }

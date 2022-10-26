@@ -3,6 +3,7 @@ package com.example.demo.poc.handler;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.example.demo.poc.event.TimerEvent;
+import com.example.demo.poc.model.LockItem;
 import com.example.demo.poc.service.LockService;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpStatus;
@@ -26,12 +27,20 @@ public class JobHandler implements RequestHandler<TimerEvent, String> {
         try {
             this.context = context;
             LockService lockService = new LockService(timerEvent,context);
-            lockService.putItem();
+            LockItem lockItem=lockService.putItem();
+            if(!lockItem.isActive()) {
+                context.getLogger().log("Lock is held by another owner "+lockItem.getOwnerName()
+                        + " CurrentOwner is "+lockService.getOwnerName());
+                return lockItem.toString();
+            }
             lockService.scheduleLockUpdate();
             String response= processEvent(timerEvent);
             log("Output is :"+response);
+            log("Sleeping for 180 seconds....");
+            Thread.sleep(180000);
+            lockService.setStatus(false);
             return response;
-        } catch (IOException e) {
+        } catch (IOException|InterruptedException e) {
             throw new RuntimeException(e);
         }
 
