@@ -72,12 +72,11 @@ public class LockService {
 //        return lockItem;
 //    }
 
-    public LockItem setStatus(boolean status) {
+    public LockItem releaseLock(){
+
         LockItem lockItem = getItem(key);
-        if(lockItem == null) {
-            lockItem = new LockItem(key,leaseDuration,startTime,true,ownerName,System.currentTimeMillis());
-        }
-        lockItem.setActive(status);
+
+        lockItem.setActive(false); //release lock
         DynamoDBMapper mapper = new DynamoDBMapper(client);
         log("updating LockItem in setStatus method"+lockItem);
         mapper.save(lockItem);
@@ -90,13 +89,15 @@ public class LockService {
         if(lockItem == null) {
             lockItem = new LockItem(key,leaseDuration,startTime,true,ownerName,System.currentTimeMillis());
         }
+        boolean ownerOfTheLock = lockItem.getOwnerName().equals(ownerName);
 
-        if(!lockItem.getOwnerName().equals(ownerName) &&
-                System.currentTimeMillis() > lockItem.getLeaseRenewalTimeInMilliSeconds()+leaseDuration) {
+        if(!ownerOfTheLock) {
+              if(  System.currentTimeMillis() > lockItem.getLeaseRenewalTimeInMilliSeconds()+leaseDuration) {
 
-                lockItem.setLeaseRenewalTimeInMilliSeconds(System.currentTimeMillis());
-                lockItem.setOwnerName(ownerName);
-                lockItem.setActive(true);
+                  lockItem.setLeaseRenewalTimeInMilliSeconds(System.currentTimeMillis());
+                  lockItem.setOwnerName(ownerName);
+                  lockItem.setActive(true);
+              }
         }  else {
             lockItem.setLeaseRenewalTimeInMilliSeconds(System.currentTimeMillis());
             lockItem.setActive(true);

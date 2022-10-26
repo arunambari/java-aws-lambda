@@ -37,10 +37,10 @@ public class JobHandler implements RequestHandler<TimerEvent, String> {
             String response= processEvent(timerEvent);
             log("Output is :"+response);
             log("Sleeping for 180 seconds....");
-            Thread.sleep(180000);
-            lockService.setStatus(false);
+           // Thread.sleep(180000);
+            lockService.releaseLock();
             return response;
-        } catch (IOException|InterruptedException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
