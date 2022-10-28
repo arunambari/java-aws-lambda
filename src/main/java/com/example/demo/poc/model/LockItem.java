@@ -4,6 +4,11 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+
 import static com.example.demo.poc.model.LockConstant.TABLE_NAME;
 
 @DynamoDBTable(tableName= TABLE_NAME)
@@ -88,13 +93,16 @@ public class LockItem {
 
     @Override
     public String toString() {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+        LocalDateTime st = Instant.ofEpochMilli(startTime).atZone(ZoneId.systemDefault()).toLocalDateTime();
+        LocalDateTime lease = Instant.ofEpochMilli(leaseRenewalTimeInMilliSeconds).atZone(ZoneId.systemDefault()).toLocalDateTime();
         return "LockItem{" +
                 "key='" + key + '\'' +
                 ", leaseDuration=" + leaseDuration +
-                ", startTime=" + startTime +
+                ", startTime=" + dtf.format(st) +
                 ", active=" + active +
                 ", ownerName='" + ownerName + '\'' +
-                ", leaseRenewalTimeInMilliSeconds=" + leaseRenewalTimeInMilliSeconds +
+                ", leaseRenewalTimeInMilliSeconds=" + dtf.format(lease) +
                 '}';
     }
 }

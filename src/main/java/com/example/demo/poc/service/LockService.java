@@ -21,6 +21,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import com.amazonaws.services.lambda.runtime.Context;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static com.example.demo.poc.model.LockConstant.*;
 
@@ -61,16 +63,23 @@ public class LockService {
     }
 
     AmazonDynamoDB client = AmazonDynamoDBClientBuilder.standard().withRegion(regionString).build();
-//    public LockItem  addItem(String key,long leaseDuration, Long startTime, boolean active) {
-//
-//        LockItem   lockItem = new LockItem(key,leaseDuration,startTime,true,ownerName,leaseRenewalTimeInMilliSeconds);
-//
-//        DynamoDBMapper mapper = new DynamoDBMapper(client);
-//        mapper.save(lockItem);
-//
-//        lockItem = mapper.load(LockItem.class,key);
-//        return lockItem;
-//    }
+    public LockItem  addItem(String key,long leaseDuration, Long startTime, boolean active,String ownerName) throws JsonProcessingException {
+        this.key = key;
+        this.startTime = startTime;
+        this.leaseDuration = leaseDuration;
+        this.ownerName = ownerName;
+        DynamoDBMapper mapper = new DynamoDBMapper(client);
+        LockItem lockItem = mapper.load(LockItem.class,key);
+        log("Inside addItem:: what is in DB currently is "+new ObjectMapper().writeValueAsString(lockItem));
+
+        lockItem = new LockItem(key,leaseDuration,startTime,true,ownerName,startTime);
+
+        mapper.save(lockItem);
+
+        lockItem = mapper.load(LockItem.class,key);
+        log("Inside addItem after saving :: "+new ObjectMapper().writeValueAsString(lockItem));
+        return lockItem;
+    }
 
     public LockItem releaseLock(){
 
@@ -80,13 +89,7 @@ public class LockService {
         DynamoDBMapper mapper = new DynamoDBMapper(client);
         log("updating LockItem in setStatus method"+lockItem);
 
-        DynamoDBSaveExpression saveExpression = new DynamoDBSaveExpression();
-        Map<String, ExpectedAttributeValue> expected = new HashMap<>();
-       // expected.put("key", new ExpectedAttributeValue().withValue(new AttributeValue().withS(key)));
-        expected.put("active", new ExpectedAttributeValue().withValue(new AttributeValue().withN("1")));
-        expected.put("ownerName", new ExpectedAttributeValue(new AttributeValue().withS(ownerName)));
-        saveExpression.setExpected(expected);
-        saveExpression.setConditionalOperator(ConditionalOperator.AND);
+        DynamoDBSaveExpression saveExpression = getReleaseLockDynamicExpression();
         try {
             mapper.save(lockItem, saveExpression);
         }catch (ConditionalCheckFailedException e) {
@@ -96,58 +99,73 @@ public class LockService {
         return lockItem;
 
     }
-    public LockItem updateLockBasedOnScheduler()
-    {
-        log("Inside scheduleLockItem");
-        return putItem();
+
+    private DynamoDBSaveExpression getReleaseLockDynamicExpression() {
+        DynamoDBSaveExpression saveExpression = new DynamoDBSaveExpression();
+        Map<String, ExpectedAttributeValue> expected = new HashMap<>();
+        // expected.put("key", new ExpectedAttributeValue().withValue(new AttributeValue().withS(key)));
+        expected.put("active", new ExpectedAttributeValue().withValue(new AttributeValue().withN("1")));
+        expected.put("ownerName", new ExpectedAttributeValue(new AttributeValue().withS(ownerName)));
+        saveExpression.setExpected(expected);
+        saveExpression.setConditionalOperator(ConditionalOperator.AND);
+        return saveExpression;
     }
 
-    public LockItem putItem() {
+    public void updateLockBasedOnScheduler() throws JsonProcessingException {
+        log("Inside scheduleLockItem");
+         putItem();
+    }
+
+    public boolean putItem() throws JsonProcessingException {
         LockItem lockItem = getItem(key);
+        log("-----------Begin PutItem--------");
+        log("Inside putItem:: what is in DB currently is "+new ObjectMapper().writeValueAsString(lockItem));
+
         if(lockItem == null) {
             lockItem = new LockItem(key,leaseDuration,startTime,true,ownerName,System.currentTimeMillis());
         }
-;        boolean ownerOfTheLock = lockItem.getOwnerName().equals(ownerName);
+        long currentTime = System.currentTimeMillis();
+        boolean ownerOfTheLock = lockItem.getOwnerName().equals(ownerName);
         long diffCurrentTimeWithLeaseDuration = System.currentTimeMillis() - lockItem.getLeaseDuration();
-        long leaseRenewalTime=lockItem.getLeaseRenewalTimeInMilliSeconds();
-
-
-        log("currentOwner in DB ::"+lockItem.getOwnerName()+" new owner acquiring or updating lock::"+ownerName+ " diffCurrentTimeWithLeaseDuration  seconds ::"+diffCurrentTimeWithLeaseDuration/1000+"  ::: leaseRenewalTime" +
-
-                leaseRenewalTime/1000+" diffleaseRenewl - diffCurrentTimeWithLeaseDuration"+(diffCurrentTimeWithLeaseDuration-leaseRenewalTime)/1000);
-        if(!ownerOfTheLock) {
-              if(  System.currentTimeMillis() > lockItem.getLeaseRenewalTimeInMilliSeconds()+leaseDuration) {
-
-                  lockItem.setLeaseRenewalTimeInMilliSeconds(System.currentTimeMillis());
-                  lockItem.setOwnerName(ownerName);
-                  lockItem.setActive(true);
-              }
-        }  else {
-            lockItem.setLeaseRenewalTimeInMilliSeconds(System.currentTimeMillis());
+        if(lockItem.getStartTime() < diffCurrentTimeWithLeaseDuration) {
+            log("Inside putItem:: Inside DB:: [isStartTime < diffCurrentTimeWithLeaseDuration is TRUE] and ownerOfTheLock is "+ownerOfTheLock);
+            lockItem.setStartTime(currentTime);
             lockItem.setActive(true);
-        }
+        } else {
+            log("Inside putItem:: Inside DB:: [startTime >  diffCurrentTimeWithLeaseDuration is TRUE] and ownerOfTheLock is "+ownerOfTheLock);
 
+        }
+        lockItem.setLeaseRenewalTimeInMilliSeconds(currentTime);
+        lockItem.setOwnerName(ownerName);
+        lockItem.setLeaseDuration(leaseDuration);
 
         DynamoDBMapper mapper = new DynamoDBMapper(client);
-        log("updating LockItem in putItem method"+lockItem);
 
+        DynamoDBSaveExpression saveExpression = getPutItemDBSaveExpression(diffCurrentTimeWithLeaseDuration);
+        try {
+          mapper.save(lockItem, saveExpression);
+          log("Inside putItem:: what is in DB currently AFTER SAVING is "+new ObjectMapper().writeValueAsString(lockItem));
+
+      }catch (ConditionalCheckFailedException e) {
+          log("conditional check failed for owner "+ownerName+ "  error cause :"+e.getMessage());
+          return false;
+      }
+        log("-----------End PutItem--------");
+        return true;
+    }
+
+    private DynamoDBSaveExpression getPutItemDBSaveExpression(long diffCurrentTimeWithLeaseDuration) {
         DynamoDBSaveExpression saveExpression = new DynamoDBSaveExpression();
         Map<String, ExpectedAttributeValue> expected = new HashMap<>();
 
 
         expected.put("active", new ExpectedAttributeValue().withValue(new AttributeValue().withN("0")));
-       expected.put("ownerName", new ExpectedAttributeValue(new AttributeValue().withS(ownerName)));
-        expected.put("leaseRenewalTimeInMilliSeconds", new ExpectedAttributeValue().withValue(new AttributeValue().withN(Long.toString(diffCurrentTimeWithLeaseDuration))).withComparisonOperator(ComparisonOperator.LT));
+        expected.put("ownerName", new ExpectedAttributeValue(new AttributeValue().withS(ownerName)));
+        expected.put("startTime", new ExpectedAttributeValue().withValue(new AttributeValue().withN(Long.toString(diffCurrentTimeWithLeaseDuration))).withComparisonOperator(ComparisonOperator.LT));
 
         saveExpression.setExpected(expected);
         saveExpression.setConditionalOperator(ConditionalOperator.OR);
-      try {
-          mapper.save(lockItem, saveExpression);
-      }catch (ConditionalCheckFailedException e) {
-          log("conditional check failed for owner "+ownerName+ "  error cause :"+e.getMessage());
-      }
-
-        return lockItem;
+        return saveExpression;
     }
 
     public LockItem getItem(String key) {
@@ -167,7 +185,7 @@ public class LockService {
         client.deleteItem(TABLE_NAME,key_to_get);
 
     }
-    private static final String generateOwnerNameFromLocalhost() {
+    public  static final String generateOwnerNameFromLocalhost() {
         try {
             return Inet4Address.getLocalHost().getHostName() + UUID.randomUUID().toString();
         } catch (final UnknownHostException e) {
@@ -178,12 +196,19 @@ public class LockService {
         long delayInMillis = leaseDuration/4;
         log("Scheduling release lock after "+delayInMillis);
         ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-        executorService.scheduleAtFixedRate(()-> updateLockBasedOnScheduler(),  500L,delayInMillis, TimeUnit.MILLISECONDS);
+        executorService.scheduleAtFixedRate(()-> {
+            try {
+                updateLockBasedOnScheduler();
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+        },  500L,delayInMillis, TimeUnit.MILLISECONDS);
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws JsonProcessingException {
         LockService lockService = new LockService();
        //  lockService.deleteItem("sit-lock");
+      //  lockService.addItem("sit-lock",120000,System.currentTimeMillis(),true,generateOwnerNameFromLocalhost());
         lockService.scheduleLockUpdate();
         System.out.println(lockService.getItem("sit-lock"));
     }

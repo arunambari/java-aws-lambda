@@ -3,6 +3,7 @@ package com.example.demo.poc.handler;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.example.demo.poc.event.TimerEvent;
+import com.example.demo.poc.model.LockConstant;
 import com.example.demo.poc.model.LockItem;
 import com.example.demo.poc.service.LockService;
 import org.apache.http.HttpEntity;
@@ -27,8 +28,9 @@ public class JobHandler implements RequestHandler<TimerEvent, String> {
         try {
             this.context = context;
             LockService lockService = new LockService(timerEvent,context);
-            LockItem lockItem=lockService.putItem();
-            if(!lockItem.isActive()) {
+            boolean locked =lockService.putItem();
+            LockItem lockItem = lockService.getItem(LockConstant.LOCK_KEY);
+            if(!locked) {
                 log("Lock is held by another owner "+lockItem.getOwnerName()
                         + " CurrentOwner is "+lockService.getOwnerName());
                 return lockItem.toString();
