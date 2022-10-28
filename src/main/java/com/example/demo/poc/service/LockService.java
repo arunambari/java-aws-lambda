@@ -6,8 +6,6 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBSaveExpression;
 import com.amazonaws.services.dynamodbv2.model.*;
 import com.example.demo.poc.event.TimerEvent;
-import com.example.demo.poc.handler.JobHandler;
-import com.example.demo.poc.model.LockConstant;
 import com.example.demo.poc.model.LockItem;
 
 
@@ -98,7 +96,7 @@ public class LockService {
         return lockItem;
 
     }
-    public LockItem scheduleLockItem()
+    public LockItem updateLockBasedOnScheduler()
     {
         log("Inside scheduleLockItem");
         return putItem();
@@ -180,13 +178,13 @@ public class LockService {
         long delayInMillis = leaseDuration/4;
         log("Scheduling release lock after "+delayInMillis);
         ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-        executorService.scheduleAtFixedRate(()->putItem(),  500L,delayInMillis, TimeUnit.MILLISECONDS);
+        executorService.scheduleAtFixedRate(()-> updateLockBasedOnScheduler(),  500L,delayInMillis, TimeUnit.MILLISECONDS);
     }
 
     public static void main(String[] args) {
         LockService lockService = new LockService();
        //  lockService.deleteItem("sit-lock");
-        lockService.putItem();
+        lockService.scheduleLockUpdate();
         System.out.println(lockService.getItem("sit-lock"));
     }
     private void log(String message) {
