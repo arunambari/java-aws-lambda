@@ -17,6 +17,7 @@ public class TimerEvent {
     private String lockTable="locktable";
     private String lockKey;
     private long leaseDuration;
+    private long testSleepDuration;
 
 
 

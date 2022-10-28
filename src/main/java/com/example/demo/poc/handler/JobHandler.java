@@ -29,18 +29,18 @@ public class JobHandler implements RequestHandler<TimerEvent, String> {
             LockService lockService = new LockService(timerEvent,context);
             LockItem lockItem=lockService.putItem();
             if(!lockItem.isActive()) {
-                context.getLogger().log("Lock is held by another owner "+lockItem.getOwnerName()
+                log("Lock is held by another owner "+lockItem.getOwnerName()
                         + " CurrentOwner is "+lockService.getOwnerName());
                 return lockItem.toString();
             }
             lockService.scheduleLockUpdate();
             String response= processEvent(timerEvent);
             log("Output is :"+response);
-            log("Sleeping for 180 seconds....");
-           // Thread.sleep(180000);
+            log("Sleeping fo"+ timerEvent.getTestSleepDuration()/1000+" seconds....");
+            Thread.sleep(timerEvent.getTestSleepDuration());
             lockService.releaseLock();
             return response;
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
 

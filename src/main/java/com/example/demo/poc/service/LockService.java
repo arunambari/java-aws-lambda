@@ -85,7 +85,7 @@ public class LockService {
         DynamoDBSaveExpression saveExpression = new DynamoDBSaveExpression();
         Map<String, ExpectedAttributeValue> expected = new HashMap<>();
        // expected.put("key", new ExpectedAttributeValue().withValue(new AttributeValue().withS(key)));
-        expected.put("active", new ExpectedAttributeValue().withValue(new AttributeValue().withN("0")));
+        expected.put("active", new ExpectedAttributeValue().withValue(new AttributeValue().withN("1")));
         expected.put("ownerName", new ExpectedAttributeValue(new AttributeValue().withS(ownerName)));
         saveExpression.setExpected(expected);
         saveExpression.setConditionalOperator(ConditionalOperator.AND);
@@ -98,6 +98,11 @@ public class LockService {
         return lockItem;
 
     }
+    public LockItem scheduleLockItem()
+    {
+        log("Inside scheduleLockItem");
+        return putItem();
+    }
 
     public LockItem putItem() {
         LockItem lockItem = getItem(key);
@@ -109,7 +114,8 @@ public class LockService {
         long leaseRenewalTime=lockItem.getLeaseRenewalTimeInMilliSeconds();
 
 
-        log("diffCurrentTimeWithLeaseDuration  seconds ::"+diffCurrentTimeWithLeaseDuration/1000+"  ::: leaseRenewalTime" +
+        log("currentOwner in DB ::"+lockItem.getOwnerName()+" new owner acquiring or updating lock::"+ownerName+ " diffCurrentTimeWithLeaseDuration  seconds ::"+diffCurrentTimeWithLeaseDuration/1000+"  ::: leaseRenewalTime" +
+
                 leaseRenewalTime/1000+" diffleaseRenewl - diffCurrentTimeWithLeaseDuration"+(diffCurrentTimeWithLeaseDuration-leaseRenewalTime)/1000);
         if(!ownerOfTheLock) {
               if(  System.currentTimeMillis() > lockItem.getLeaseRenewalTimeInMilliSeconds()+leaseDuration) {
@@ -171,10 +177,10 @@ public class LockService {
         }
     }
     public void scheduleLockUpdate() {
-        long delayInSeconds = leaseDuration/4;
-        log("Scheduling release lock after "+delayInSeconds);
+        long delayInMillis = leaseDuration/4;
+        log("Scheduling release lock after "+delayInMillis);
         ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-        executorService.schedule(()->putItem(),  delayInSeconds, TimeUnit.MILLISECONDS);
+        executorService.scheduleAtFixedRate(()->putItem(),  500L,delayInMillis, TimeUnit.MILLISECONDS);
     }
 
     public static void main(String[] args) {
