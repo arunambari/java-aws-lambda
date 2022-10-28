@@ -22,7 +22,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static com.example.demo.poc.model.LockConstant.*;
 
@@ -70,14 +69,14 @@ public class LockService {
         this.ownerName = ownerName;
         DynamoDBMapper mapper = new DynamoDBMapper(client);
         LockItem lockItem = mapper.load(LockItem.class,key);
-        log("Inside addItem:: what is in DB currently is "+new ObjectMapper().writeValueAsString(lockItem));
+        log("Inside addItem:: what is in DB currently is "+lockItem);
 
         lockItem = new LockItem(key,leaseDuration,startTime,true,ownerName,startTime);
 
         mapper.save(lockItem);
 
         lockItem = mapper.load(LockItem.class,key);
-        log("Inside addItem after saving :: "+new ObjectMapper().writeValueAsString(lockItem));
+        log("Inside addItem after saving :: "+lockItem);
         return lockItem;
     }
 
@@ -119,7 +118,7 @@ public class LockService {
     public boolean putItem() throws JsonProcessingException {
         LockItem lockItem = getItem(key);
         log("-----------Begin PutItem--------");
-        log("Inside putItem:: what is in DB currently is "+new ObjectMapper().writeValueAsString(lockItem));
+        log("Inside putItem:: what is in DB currently is "+lockItem);
 
         if(lockItem == null) {
             lockItem = new LockItem(key,leaseDuration,startTime,true,ownerName,System.currentTimeMillis());
@@ -144,7 +143,7 @@ public class LockService {
         DynamoDBSaveExpression saveExpression = getPutItemDBSaveExpression(diffCurrentTimeWithLeaseDuration);
         try {
           mapper.save(lockItem, saveExpression);
-          log("Inside putItem:: what is in DB currently AFTER SAVING is "+new ObjectMapper().writeValueAsString(lockItem));
+          log("Inside putItem:: what is in DB currently AFTER SAVING is "+lockItem);
 
       }catch (ConditionalCheckFailedException e) {
           log("conditional check failed for owner "+ownerName+ "  error cause :"+e.getMessage());

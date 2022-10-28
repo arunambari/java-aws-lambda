@@ -3,11 +3,14 @@ package com.example.demo.poc.model;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 
 import static com.example.demo.poc.model.LockConstant.TABLE_NAME;
 
@@ -96,13 +99,28 @@ public class LockItem {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
         LocalDateTime st = Instant.ofEpochMilli(startTime).atZone(ZoneId.systemDefault()).toLocalDateTime();
         LocalDateTime lease = Instant.ofEpochMilli(leaseRenewalTimeInMilliSeconds).atZone(ZoneId.systemDefault()).toLocalDateTime();
-        return "LockItem{" +
-                "key='" + key + '\'' +
-                ", leaseDuration=" + leaseDuration +
-                ", startTime=" + dtf.format(st) +
-                ", active=" + active +
-                ", ownerName='" + ownerName + '\'' +
-                ", leaseRenewalTimeInMilliSeconds=" + dtf.format(lease) +
-                '}';
+        HashMap<String, String> lockItemHash = new HashMap<>();
+        lockItemHash.put("key",key);
+        lockItemHash.put("leaseDuration",Long.toString(leaseDuration));
+        lockItemHash.put("startTime",dtf.format(st));
+        lockItemHash.put("active",Boolean.toString(active));
+        lockItemHash.put("owmerName",ownerName);
+        lockItemHash.put("leaseRenewalTimeInMilliSeconds",dtf.format(lease));
+
+        try {
+            String returnString = new ObjectMapper().writeValueAsString(lockItemHash);
+            return returnString;
+        } catch (JsonProcessingException e) {
+
+           return  "LockItem{" +
+                    "key='" + key + '\'' +
+                    ", leaseDuration=" + leaseDuration +
+                    ", startTime=" + dtf.format(st) +
+                    ", active=" + active +
+                    ", ownerName='" + ownerName + '\'' +
+                    ", leaseRenewalTimeInMilliSeconds=" + dtf.format(lease) +
+                    '}';
+        }
+
     }
 }
