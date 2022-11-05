@@ -3,6 +3,7 @@ package com.example.demo.poc.model;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
+import com.amazonaws.services.dynamodbv2.xspec.L;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -21,7 +22,7 @@ public class LockItem {
    private  String key;
    private  long leaseDuration;
    private  long startTime;
-   private boolean active;
+   private long active;
 
    private String ownerName;
    private long leaseRenewalTimeInMilliSeconds;
@@ -31,13 +32,21 @@ public class LockItem {
 
     }
 
-    public LockItem(String key, long leaseDuration, long startTime, boolean active, String ownerName, long leaseRenewalTimeInMilliSeconds) {
+    public LockItem(String key, long leaseDuration, long startTime, long active, String ownerName, long leaseRenewalTimeInMilliSeconds) {
         this.key = key;
         this.leaseDuration = leaseDuration;
         this.startTime = startTime;
         this.active = active;
         this.ownerName = ownerName;
         this.leaseRenewalTimeInMilliSeconds = leaseRenewalTimeInMilliSeconds;
+    }
+    public LockItem(LockItem lockItem) {
+        this.key= lockItem.key;
+        this.leaseDuration = lockItem.leaseDuration;
+        this.startTime = lockItem.startTime;
+        this.active = lockItem.active;
+        this.ownerName = lockItem.ownerName;
+        this.leaseRenewalTimeInMilliSeconds = lockItem.leaseRenewalTimeInMilliSeconds;
     }
 
     @DynamoDBHashKey
@@ -86,11 +95,11 @@ public class LockItem {
     }
 
     @DynamoDBAttribute
-    public boolean isActive() {
+    public Long isActive() {
         return active;
     }
 
-    public void setActive(boolean active) {
+    public void setActive(Long active) {
         this.active = active;
     }
 
@@ -103,7 +112,7 @@ public class LockItem {
         lockItemHash.put("key",key);
         lockItemHash.put("leaseDuration",Long.toString(leaseDuration));
         lockItemHash.put("startTime",dtf.format(st));
-        lockItemHash.put("active",Boolean.toString(active));
+        lockItemHash.put("active",Long.toString(active));
         lockItemHash.put("owmerName",ownerName);
         lockItemHash.put("leaseRenewalTimeInMilliSeconds",dtf.format(lease));
 

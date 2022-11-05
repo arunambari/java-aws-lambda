@@ -1,6 +1,7 @@
 package com.example.demo.poc.event;
 
 
+import com.example.demo.poc.model.LockConstant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,13 +19,6 @@ public class TimerEvent {
     private String lockKey;
     private long leaseDuration;
     private long testSleepDuration;
+    private String httpMethod= LockConstant.HTTP_GET;
 
-
-
-    public String initialContent() {
-        return "(Beginning) "+toString();
-    }
-    public String withResponseContent() {
-        return "(End) "+toString();
-    }
 }
